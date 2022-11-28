@@ -1,10 +1,11 @@
+import html2canvas from "html2canvas";
 import type { NextPage } from "next";
 import Head from "next/head";
-import styled from "styled-components";
+import { ChangeEvent, useCallback, useRef, useState } from "react";
 import { QRCode } from "react-qrcode-logo";
-import { useCallback, useEffect, useRef, useState } from "react";
+import styled from "styled-components";
 import { colorOptions, gradientOptions } from "../components/ColorTheme";
-import html2canvas from "html2canvas";
+import ellipsisAddress from "../utils/ellipsisAddress";
 
 interface IColor {
   background: string;
@@ -25,16 +26,20 @@ const SMain = styled.div`
   flex-direction: column;
   width: 100%;
   max-width: 90vw;
-  margin-top: 4rem;
+  margin-top: 3.5rem;
 `;
 
-const SAppName = styled.p`
+const SAppName = styled.div`
   position: fixed;
+  display: flex;
+  align-items: center;
   top: 1.2rem;
   left: 2rem;
+  color: white;
+  /* background: red; */
   font-style: normal;
   font-weight: 600;
-  font-size: 20px;
+  font-size: 1rem;
 `;
 
 const SBound = styled.div`
@@ -47,7 +52,7 @@ const SBound = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 3.75rem;
+  padding: .8rem 3.5rem;
 `;
 
 const SForm = styled.form`
@@ -59,17 +64,17 @@ const SForm = styled.form`
 `;
 
 const STitle = styled.p`
-  font-size: 1.25rem;
-  padding-bottom: 10px;
+  font-size: 1.05rem;
+  padding-bottom: 5px;
 `;
 
 const STextInput = styled.input`
-  height: 3.125rem;
-  border: 1px solid #535a83;
+  height: 2.7rem;
+  border: none;
   border-radius: 1rem;
   font-size: 16px;
   padding: 1rem;
-  margin-bottom: 1.25rem;
+  margin-bottom: .8rem;
   background: #535a83;
   resize: none;
   outline: none;
@@ -79,12 +84,12 @@ const STextInput = styled.input`
 const SButton = styled.div`
   display: grid;
   place-items: center;
-  height: 3.125rem;
+  height: 2.7rem;
   width: 100%;
   color: white;
-  font-size: 1.25rem;
+  font-size: .9rem;
   background: #15ff00;
-  margin-top: 1rem;
+  margin-top: .8rem;
   border-radius: 1rem;
   font-weight: 600;
   text-align: center;
@@ -112,7 +117,7 @@ const SColorBox = styled.div<IOperation>`
   height: 11rem;
   border-radius: 1.125rem;
   background: #1d1d1d;
-  padding: 1rem;
+  padding: .7rem;
   display: grid;
   place-items: center;
   gap: 0.7rem;
@@ -143,11 +148,12 @@ const SSelectBox = styled.div`
   display: flex;
   justify-content: space-between;
   margin-top: 1rem;
+  padding: 1rem 3rem;
 `;
 
 const SSelectOption = styled.div`
-  width: 35vw;
-  height: 18rem;
+  width: 30vw;
+  height: 16rem;
   background: #282e50;
   border-radius: 25px;
   display: grid;
@@ -160,34 +166,58 @@ const SExportQR = styled.div<IColor>`
   z-index: -5000;
   width: 100vw;
   height: 100vh;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
   position: fixed;
-    top: 0;
-    left: 0;
-    transform: translateX(-100%);  
-    `;
+  justify-content: center;
+  top: 0;
+  left: 0;
+  transform: translateX(-100%);  
+  `;
+
+const SBack = styled.div`
+  background: rgba(255, 255, 255, 0.18);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  margin-right: 1rem;      
+  `;
+
+const SInfo = styled.div`
+  display: flex;
+  flex-direction: column;
+  margin-left: 3rem;
+  background: linear-gradient(90deg, #313D48 -5%, #1D2227 108%);
+  border-width: 1px 0px 0px 1px;
+  border-style: solid;
+  border-color: #404E5C;
+  border-radius: 25px;
+  padding: 1rem 0;
+`
+
+const SItem = styled.div`
+  display: flex;
+  padding:.5rem 3rem;
+  width: 18rem;
+`
+
+const SImg = styled.img`
+  width: 16px;
+  margin-right: 1rem;
+`
 
 const Home: NextPage = () => {
-  const [index, setIndex] = useState(0);
-  const [gradientIndex, setGradientIndex] = useState(0);
   const [color, setColor] = useState(colorOptions[0]);
   const [gradientColor, setGradientColor] = useState(gradientOptions[0]);
   const [compose, setCompose] = useState(false);
   const [showOption, setShowOption] = useState(true);
   const [wallet, setWallet] = useState("");
   const [name, setName] = useState("");
+  const [subject, setSubject] = useState("");
   const [qrCodeURL, setQrCodeURL] = useState<HTMLCanvasElement>();
+  const [logoSrc, setLogoSrc] = useState("/ylideIcon.svg")
 
   const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setColor(colorOptions[index]);
-  }, [index]);
-
-  useEffect(() => {
-    setGradientColor(gradientOptions[gradientIndex]);
-  }, [gradientIndex]);
 
   const captureImage = useCallback(async () => {
     const canvas = await html2canvas(panelRef.current!);
@@ -195,12 +225,31 @@ const Home: NextPage = () => {
     console.log(panelRef, canvas)
   }, [panelRef]);
 
-  const hostname = compose
-    ? "https://mail.ylide.io/compose"
-    : "https://mail.ylide.io/contacts";
+  const handleLogo = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    const file = (e.target.files as FileList)[0];
+
+    var reader = new FileReader();
+    reader.onload = function (event) {
+      if (!event.target) return;
+      const src = event.target.result as string;
+      setLogoSrc(src)
+    };
+    reader.readAsDataURL(file);
+  }, [panelRef]);
+
+  const handleHome = () => {
+    setShowOption(true)
+    setWallet("")
+    setName("")
+    setSubject("")
+  }
+
   const url = compose
-    ? `${hostname}/wallet?id=${wallet}`
-    : `${hostname}/wallet?id=${wallet}&name=${name}`;
+    ? `https://mail.ylide.io/compose?type=address&address=${wallet}&input=${name}&subject=${subject}`
+    : `https://mail.ylide.io/contacts?name=${name}&address=${wallet}`;
+  // const url = compose
+  //   ? `http://localhost:3000/compose?type=address&address=${wallet}&input=${name}&subject=${subject}`
+  //   : `http://localhost:3000/contacts?name=${name}&address=${wallet}`;
 
   const qrCodeImage = () => {
     return (
@@ -208,11 +257,11 @@ const Home: NextPage = () => {
         <QRCode
           value={url}
           enableCORS={true}
-          size={300}
+          size={360}
           bgColor={"white"}
           fgColor={color}
-          logoImage={"/ylideIcon.svg"}
-          logoWidth={50}
+          logoImage={logoSrc}
+          logoWidth={60}
           removeQrCodeBehindLogo={true}
           qrStyle={"dots"}
           eyeRadius={[
@@ -221,7 +270,19 @@ const Home: NextPage = () => {
             [20, 0, 20, 20],
           ]}
           eyeColor={color}
+          quietZone={30}
         />
+        <SInfo>
+          {name && <SItem>
+            <SImg src="/Name.svg" alt="" /><STitle> {name}</STitle>
+          </SItem>}
+          {wallet && <SItem>
+            <SImg src="/Wallet.svg" alt="" /><STitle> {ellipsisAddress(wallet, 8)}</STitle>
+          </SItem>}
+          {subject && <SItem>
+            <SImg src="/Subject.svg" alt="" /><STitle> {subject}</STitle>
+          </SItem>}
+        </SInfo>
       </SExportQR>
     );
   };
@@ -229,30 +290,26 @@ const Home: NextPage = () => {
   return (
     <>
       <Head>
-        <title>Create Next App</title>
+        <title>Ylide QR-Code</title>
         <meta name="description" content="Generated by create next app" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
       <SBody>
-        <SAppName>Ylide QR-Code Generator</SAppName>
+        {qrCodeImage()}
+
+        <SAppName><SBack onClick={handleHome}></SBack> <p>Ylide QR-Code Generator</p> </SAppName>
         <SMain>
           {!showOption ? (
             <>
               <SBound>
                 <SForm>
-                  {!compose ? (
-                    <>
-                      <STitle>Name</STitle>
-                      <STextInput
-                        onChange={(e) => setName(e.target.value)}
-                        value={name}
-                        required
-                      />
-                    </>
-                  ) : (
-                    <></>
-                  )}
+
+                  <STitle>Name</STitle>
+                  <STextInput
+                    onChange={(e) => setName(e.target.value)}
+                    value={name}
+                  />
 
                   <STitle>Wallet ID</STitle>
                   <STextInput
@@ -260,6 +317,16 @@ const Home: NextPage = () => {
                     value={wallet}
                     required
                   />
+                  {compose ? (
+                    <>
+                      <STitle>Subject</STitle>
+                      <STextInput
+                        onChange={(e) => setSubject(e.target.value)}
+                      />
+                    </>
+                  ) : (
+                    <></>
+                  )}
 
                   <a
                     href={qrCodeURL && qrCodeURL.toDataURL("image/png")}
@@ -276,7 +343,7 @@ const Home: NextPage = () => {
                     size={180}
                     bgColor={"white"}
                     fgColor={color}
-                    logoImage={"/ylideIcon.svg"}
+                    logoImage={logoSrc}
                     logoWidth={30}
                     removeQrCodeBehindLogo={true}
                     qrStyle={"dots"}
@@ -294,7 +361,7 @@ const Home: NextPage = () => {
                   <STitle>Color theme</STitle>
                   <SColorBox width={9}>
                     {colorOptions.map((color, i) => (
-                      <SColor background={color} onClick={() => setIndex(i)} />
+                      <SColor background={color} onClick={() => setColor(colorOptions[i])} key={i} />
                     ))}
                   </SColorBox>
                 </SOperations>
@@ -303,17 +370,20 @@ const Home: NextPage = () => {
                   <SColorBox width={13}>
                     {gradientOptions.map((color, i) => (
                       <SColor
+                        key={i}
                         background={color}
-                        onClick={() => setGradientIndex(i)}
-                      />
+                        onClick={() => setGradientColor(gradientOptions[i])} />
                     ))}
                   </SColorBox>
                 </SOperations>
-                <SOperations>
+                <SOperations >
                   <STitle>Center logo</STitle>
                   <SLogoBox>
-                    <p>k</p>
-                    <SButton style={{ height: "2.25rem" }}>Change</SButton>
+                    <img src={logoSrc} style={{ width: "100px", maxHeight: "100px" }} alt="" />
+                    <SButton style={{ height: "2.25rem" }}>
+                      <input type="file" id="logo" accept="image/*" hidden onChange={handleLogo} />
+                      <label htmlFor="logo">Change</label>
+                    </SButton>
                   </SLogoBox>
                 </SOperations>
               </SBound>
@@ -345,8 +415,6 @@ const Home: NextPage = () => {
           )}
         </SMain>
       </SBody>
-      {qrCodeImage()}
-
     </>
   );
 };
